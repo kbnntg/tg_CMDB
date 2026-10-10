@@ -1,0 +1,44 @@
+# ---------------- Python ----------------
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# ---------------- 虚拟环境 ----------------
+.venv/
+venv/
+env/
+ENV/
+
+# ---------------- 本地环境变量（含数据库口令，绝不能提交） ----------------
+.env
+.env.*
+!.env.example
+
+# ---------------- IDE ----------------
+# .idea 里有 deployment.xml，会暴露服务器地址与登录方式，整目录忽略
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# ---------------- 日志与运行时数据 ----------------
+*.log
+logs/
+*.sqlite3
+*.db
+*.pid
+
+# 前端「导出CSV」下载的文件名形如 hosts_20250101120000.csv
+hosts_*.csv
+exports/
+
+# ---------------- 系统垃圾文件 ----------------
+.DS_Store
+Thumbs.db
+desktop.ini

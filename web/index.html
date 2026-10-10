@@ -1,0 +1,1509 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>主机管理 - CMDB配置管理系统</title>
+    <!-- Vue 3 本地文件（离线可用，内网无需外网 CDN） -->
+    <script src="/static/vendor/vue.global.prod.js"></script>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        :root {
+            --primary: #2563eb;
+            --primary-dark: #1d4ed8;
+            --primary-light: #eff4ff;
+            --text: #1f2937;
+            --text-sub: #6b7280;
+            --border: #e5e7eb;
+            --bg: #f5f6f8;
+            --radius: 8px;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+            "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            font-size: 14px;
+        }
+
+        /* Vue 挂载完成前隐藏内容，避免闪现未渲染的模板 */
+        #app { visibility: hidden; }
+
+        #app.mounted { visibility: visible; }
+
+        .fallback {
+            max-width: 720px;
+            margin: 80px auto;
+            padding: 24px 28px;
+            background: #fff;
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            line-height: 1.8;
+        }
+
+        .fallback h2 { font-size: 17px; margin-bottom: 12px; }
+
+        .fallback code {
+            background: #f3f4f6;
+            padding: 2px 6px;
+            border-radius: 4px;
+        }
+
+        /* ---------- 顶部导航 ---------- */
+        .navbar {
+            background: #fff;
+            border-bottom: 1px solid var(--border);
+            height: 56px;
+            display: flex;
+            align-items: center;
+            padding: 0 24px;
+            gap: 32px;
+            position: sticky;
+            top: 0;
+            z-index: 20;
+        }
+
+        .brand { font-weight: 600; font-size: 15px; display: flex; align-items: center; gap: 8px; }
+
+        .brand .dot { color: var(--primary); font-size: 18px; line-height: 1; }
+
+        .nav-menu { display: flex; gap: 8px; flex: 1; }
+
+        .nav-item {
+            padding: 8px 14px;
+            border-radius: 6px;
+            color: var(--text-sub);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 14px;
+            border: none;
+            background: none;
+            transition: .15s;
+        }
+
+        .nav-item:hover { background: var(--bg); color: var(--text); }
+
+        .nav-item.active {
+            color: var(--primary);
+            background: var(--primary-light);
+            font-weight: 500;
+        }
+
+        .nav-bell { color: var(--text-sub); cursor: pointer; font-size: 16px; padding: 4px; }
+
+        /* ---------- 页面主体 ---------- */
+        .page { padding: 20px 24px 40px; max-width: 1600px; margin: 0 auto; }
+
+        .card {
+            background: #fff;
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 16px 20px;
+            margin-bottom: 16px;
+        }
+
+        .toolbar { display: flex; gap: 12px; }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            height: 36px;
+            padding: 0 16px;
+            border-radius: 6px;
+            border: 1px solid var(--border);
+            background: #fff;
+            color: var(--text);
+            font-size: 14px;
+            cursor: pointer;
+            transition: .15s;
+            white-space: nowrap;
+        }
+
+        .btn:hover { border-color: #cbd5e1; background: #fafafa; }
+
+        .btn:disabled { opacity: .55; cursor: not-allowed; }
+
+        .btn-primary {
+            background: var(--primary);
+            border-color: var(--primary);
+            color: #fff;
+            font-weight: 500;
+        }
+
+        .btn-primary:hover { background: var(--primary-dark); border-color: var(--primary-dark); }
+
+        /* 危险操作（删除）：默认描边样式，hover 才变红，避免误点 */
+        .btn-danger { color: #dc2626; border-color: #fecaca; background: #fff; }
+
+        .btn-danger:hover { background: #fef2f2; border-color: #fca5a5; color: #b91c1c; }
+
+        /* 确认弹窗里的实心红按钮 */
+        .btn-danger-solid {
+            background: #dc2626;
+            border-color: #dc2626;
+            color: #fff;
+            font-weight: 500;
+        }
+
+        .btn-danger-solid:hover:not(:disabled) { background: #b91c1c; border-color: #b91c1c; }
+
+        .confirm-line { display: flex; gap: 10px; align-items: flex-start; }
+
+        .confirm-line .warn-icon {
+            flex: 0 0 24px;
+            height: 24px;
+            border-radius: 50%;
+            background: #fef3c7;
+            color: #b45309;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+        }
+
+        .confirm-line .ok-icon {
+            flex: 0 0 24px;
+            height: 24px;
+            border-radius: 50%;
+            background: #dcfce7;
+            color: #15803d;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+        }
+
+        .result-stats {
+            display: flex;
+            gap: 12px;
+            margin-top: 16px;
+            flex-wrap: wrap;
+        }
+
+        .result-stats .stat {
+            flex: 1 1 140px;
+            background: #f8fafc;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 12px 14px;
+        }
+
+        .result-stats .stat .k { color: var(--text-sub); font-size: 12.5px; margin-bottom: 4px; }
+
+        .result-stats .stat .v { font-size: 20px; font-weight: 600; color: var(--text); }
+
+        .btn-sm { height: 30px; padding: 0 12px; font-size: 13px; }
+
+        .btn-block { width: 100%; }
+
+        /* ---------- 筛选区 ---------- */
+        .filters { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
+
+        .search-box {
+            position: relative;
+            flex: 1 1 320px;
+            min-width: 240px;
+            max-width: 420px;
+        }
+
+        .search-box input {
+            width: 100%;
+            height: 40px;
+            padding: 0 12px 0 38px;
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            font-size: 14px;
+            outline: none;
+            transition: .15s;
+        }
+
+        .search-box input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(37, 99, 235, .1); }
+
+        .search-box .icon {
+            position: absolute;
+            left: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #9ca3af;
+            font-size: 15px;
+        }
+
+        select.filter {
+            height: 40px;
+            min-width: 160px;
+            padding: 0 32px 0 12px;
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            background: #fff url("data:image/svg+xml;charset=utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E") no-repeat right 12px center;
+            font-size: 14px;
+            color: var(--text);
+            appearance: none;
+            outline: none;
+            cursor: pointer;
+        }
+
+        select.filter:focus { border-color: var(--primary); }
+
+        /* ---------- 统计 / 导出 ---------- */
+        .list-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        .list-count { display: flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 500; }
+
+        .list-count .info {
+            color: var(--primary);
+            font-size: 15px;
+        }
+
+        .list-count .sub { color: var(--text-sub); font-weight: 400; font-size: 13px; }
+
+        .head-actions { display: flex; gap: 10px; }
+
+        /* ---------- 表格 ---------- */
+        .table-wrap { overflow-x: auto; }
+
+        table { width: 100%; border-collapse: collapse; min-width: 1180px; }
+
+        thead th {
+            text-align: left;
+            font-weight: 400;
+            color: var(--text-sub);
+            font-size: 13px;
+            padding: 12px 10px;
+            border-bottom: 1px solid var(--border);
+            white-space: nowrap;
+            background: #fff;
+        }
+
+        tbody td {
+            padding: 14px 10px;
+            border-bottom: 1px solid #f1f3f5;
+            font-size: 13.5px;
+            vertical-align: middle;
+            color: #374151;
+        }
+
+        tbody tr:hover { background: #fafbfc; }
+
+        tbody tr.selected { background: var(--primary-light); }
+
+        .cell-main { font-weight: 500; color: var(--text); }
+
+        .cell-sub { color: var(--text-sub); font-size: 12px; margin-top: 2px; }
+
+        .mono { font-variant-numeric: tabular-nums; }
+
+        .col-check { width: 44px; }
+        .col-host { min-width: 170px; }
+        .col-tags { max-width: 150px; }
+        .col-actions { min-width: 150px; }
+
+        .thin { font-size: 12.5px; color: var(--text-sub); line-height: 1.4; }
+
+        input[type=checkbox] {
+            width: 16px;
+            height: 16px;
+            accent-color: var(--primary);
+            cursor: pointer;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 2px 10px;
+            border-radius: 999px;
+            font-size: 12.5px;
+            background: #f3f4f6;
+            color: #4b5563;
+            white-space: nowrap;
+        }
+
+        .badge-env { background: #fef3c7; color: #92400e; }
+
+        .tag {
+            display: inline-block;
+            padding: 1px 7px;
+            margin: 1px 3px 1px 0;
+            border-radius: 4px;
+            background: #eef2ff;
+            color: #4338ca;
+            font-size: 12px;
+        }
+
+        .status { display: inline-flex; align-items: center; gap: 6px; font-weight: 500; }
+
+        .status .signal {
+            display: inline-flex;
+            align-items: flex-end;
+            gap: 2px;
+            height: 12px;
+        }
+
+        .status .signal i { width: 2.5px; background: currentColor; border-radius: 1px; }
+
+        .status .signal i:nth-child(1) { height: 5px; }
+        .status .signal i:nth-child(2) { height: 8px; }
+        .status .signal i:nth-child(3) { height: 11px; }
+
+        .status.on { color: #15803d; }
+        .status.off { color: #6b7280; }
+
+        .actions { display: flex; align-items: center; gap: 12px; white-space: nowrap; }
+
+        .link {
+            background: none;
+            border: none;
+            padding: 0;
+            font-size: 13.5px;
+            color: var(--primary);
+            cursor: pointer;
+        }
+
+        .link:hover { text-decoration: underline; }
+
+        .link.danger { color: #dc2626; }
+        .link.success { color: #15803d; }
+
+        .empty { text-align: center; color: var(--text-sub); padding: 48px 0; }
+
+        .empty .big { font-size: 28px; display: block; margin-bottom: 10px; opacity: .35; }
+
+        /* ---------- 分页 ---------- */
+        .pager {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            padding-top: 16px;
+            flex-wrap: wrap;
+        }
+
+        .pager .info { color: var(--text-sub); font-size: 13.5px; }
+
+        .pager .controls { display: flex; align-items: center; gap: 8px; }
+
+        .pager button {
+            min-width: 34px;
+            height: 34px;
+            padding: 0 10px;
+            border: 1px solid var(--border);
+            background: #fff;
+            border-radius: 6px;
+            cursor: pointer;
+            color: var(--text);
+            font-size: 13.5px;
+        }
+
+        .pager button:disabled { opacity: .45; cursor: not-allowed; }
+
+        .pager button.current {
+            background: var(--primary);
+            border-color: var(--primary);
+            color: #fff;
+            font-weight: 500;
+        }
+
+        /* ---------- 弹窗 ---------- */
+        .mask {
+            position: fixed;
+            inset: 0;
+            background: rgba(17, 24, 39, .45);
+            display: flex;
+            align-items: flex-start;
+            justify-content: center;
+            padding: 60px 16px;
+            overflow-y: auto;
+            z-index: 50;
+        }
+
+        .modal {
+            background: #fff;
+            border-radius: 10px;
+            width: 100%;
+            max-width: 720px;
+            box-shadow: 0 20px 45px rgba(0, 0, 0, .18);
+            animation: pop .16s ease-out;
+        }
+
+        @keyframes pop {
+            from { transform: translateY(-10px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+
+        .modal-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 16px 20px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .modal-head h3 { font-size: 16px; font-weight: 600; }
+
+        .modal-head .close {
+            border: none;
+            background: none;
+            font-size: 20px;
+            color: var(--text-sub);
+            cursor: pointer;
+            line-height: 1;
+        }
+
+        .modal-body { padding: 20px; max-height: 65vh; overflow-y: auto; }
+
+        .modal-foot {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+            padding: 14px 20px;
+            border-top: 1px solid var(--border);
+        }
+
+        /* ---------- 详情 ---------- */
+        .detail-title {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 16px;
+            padding-bottom: 14px;
+            border-bottom: 1px dashed var(--border);
+        }
+
+        .detail-title .icon {
+            width: 38px;
+            height: 38px;
+            border-radius: 8px;
+            background: var(--primary-light);
+            color: var(--primary);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+        }
+
+        .detail-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+            gap: 14px 20px;
+        }
+
+        .detail-grid .item .k { color: var(--text-sub); font-size: 12.5px; margin-bottom: 3px; }
+
+        .detail-grid .item .v { font-size: 13.5px; word-break: break-all; }
+
+        .section-title {
+            font-size: 14px;
+            font-weight: 600;
+            margin: 20px 0 10px;
+            padding-left: 9px;
+            border-left: 3px solid var(--primary);
+        }
+
+        /* ---------- 表单 ---------- */
+        .form-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+            gap: 16px;
+        }
+
+        .field label {
+            display: block;
+            font-size: 13px;
+            color: var(--text-sub);
+            margin-bottom: 6px;
+        }
+
+        .field input, .field select, .field textarea {
+            width: 100%;
+            height: 38px;
+            padding: 0 10px;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            font-size: 13.5px;
+            outline: none;
+            font-family: inherit;
+            background: #fff;
+            color: var(--text);
+        }
+
+        .field textarea { height: 120px; padding: 10px; resize: vertical; }
+
+        .field input:focus, .field select:focus, .field textarea:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, .1);
+        }
+
+        .hint { font-size: 12.5px; color: var(--text-sub); line-height: 1.6; }
+
+        .hint code {
+            background: #f3f4f6;
+            padding: 1px 5px;
+            border-radius: 4px;
+            font-size: 12px;
+        }
+
+        /* ---------- 提示条 ---------- */
+        .toasts {
+            position: fixed;
+            top: 70px;
+            right: 24px;
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .toast {
+            min-width: 220px;
+            max-width: 380px;
+            padding: 11px 14px;
+            border-radius: 8px;
+            background: #fff;
+            box-shadow: 0 6px 20px rgba(0, 0, 0, .13);
+            border-left: 4px solid var(--primary);
+            font-size: 13.5px;
+            animation: slide .18s ease-out;
+        }
+
+        .toast.ok { border-left-color: #16a34a; }
+        .toast.err { border-left-color: #dc2626; }
+
+        @keyframes slide {
+            from { transform: translateX(16px); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+
+        /* ---------- 页脚 ---------- */
+        .footer {
+            text-align: center;
+            color: #9ca3af;
+            font-size: 13px;
+            padding: 22px 0;
+        }
+
+        .loading-bar {
+            height: 2px;
+            background: linear-gradient(90deg, transparent, var(--primary), transparent);
+            background-size: 40% 100%;
+            animation: flow 1s linear infinite;
+        }
+
+        @keyframes flow {
+            from { background-position: -40% 0; }
+            to { background-position: 140% 0; }
+        }
+
+        /* ---------- 响应式 ---------- */
+        @media (max-width: 900px) {
+            .navbar { padding: 0 12px; gap: 12px; }
+            .nav-menu { overflow-x: auto; }
+            .page { padding: 14px; }
+            .search-box { max-width: none; }
+            select.filter { flex: 1 1 140px; min-width: 0; }
+        }
+    </style>
+</head>
+<body>
+<!-- Vue 未能从 CDN 加载时的兜底提示 -->
+<noscript>
+    <div class="fallback">
+        <h2>当前浏览器禁用了 JavaScript</h2>
+        <p>该主机管理页面需要 JavaScript 才能运行，请在浏览器设置中开启后重试。</p>
+    </div>
+</noscript>
+<div class="fallback" id="fallback" style="display:none">
+    <h2>页面资源加载失败</h2>
+    <p>前端依赖的 Vue 3 本地文件未能加载（<code>/static/vendor/vue.global.prod.js</code>）。</p>
+    <p>请确认 <code>web/vendor/vue.global.prod.js</code> 文件存在，且后端服务已重启
+        （静态目录在启动时挂载）。若文件缺失，可从任一已安装 vue 的 node_modules 中
+        把 <code>dist/vue.global.prod.js</code> 拷到该目录。</p>
+</div>
+<div id="app">
+    <!-- 顶部导航 -->
+    <header class="navbar">
+        <div class="brand"><span class="dot">◈</span> Dashboard</div>
+        <nav class="nav-menu">
+            <button class="nav-item" v-for="m in menus" :key="m.key"
+                    :class="{ active: m.key === 'host' }" @click="m.key !== 'host' && tip('『' + m.label + '』模块暂未开放')">
+                <span>{{ m.icon }}</span>{{ m.label }}
+            </button>
+        </nav>
+        <span class="nav-bell" title="通知">🔔</span>
+    </header>
+
+    <main class="page">
+        <!-- 操作栏 -->
+        <section class="card toolbar">
+            <button class="btn" @click="refresh" :disabled="loading">⟳ 刷新数据</button>
+            <button class="btn btn-primary" @click="openImport">✚ 批量导入</button>
+        </section>
+
+        <!-- 筛选区 -->
+        <section class="card filters">
+            <div class="search-box">
+                <span class="icon">🔍</span>
+                <input v-model.trim="filters.q" placeholder="搜索IP、主机名、环境、业务线..."
+                       @keyup.enter="search">
+            </div>
+            <select class="filter" v-model="filters.environment" @change="search">
+                <option value="">所有环境</option>
+                <option v-for="v in options.environment" :key="v" :value="v">{{ v }}</option>
+            </select>
+            <select class="filter" v-model="filters.provider" @change="search">
+                <option value="">所有供应商</option>
+                <option v-for="v in options.provider" :key="v" :value="v">{{ v }}</option>
+            </select>
+            <select class="filter" v-model="filters.os_type" @change="search">
+                <option value="">所有操作系统</option>
+                <option v-for="v in options.os_type" :key="v" :value="v">{{ v }}</option>
+            </select>
+            <select class="filter" v-model="filters.enabled" @change="search">
+                <option value="">启用状态（全部）</option>
+                <option value="true">正常</option>
+                <option value="false">已禁用</option>
+            </select>
+            <button class="btn" @click="resetFilters">重置</button>
+        </section>
+
+        <!-- 列表 -->
+        <section class="card" style="padding-bottom:8px">
+            <div class="list-head">
+                <div class="list-count">
+                    <span class="info">ⓘ</span>
+                    共 {{ total }} 台主机
+                    <span class="sub" v-if="selectedIds.length">· 已选择 {{ selectedIds.length }} 台</span>
+                </div>
+                <div class="head-actions">
+                    <button class="btn btn-sm" v-if="selectedIds.length" @click="batchToggle(true)"
+                            :disabled="loading">批量启用
+                    </button>
+                    <button class="btn btn-sm" v-if="selectedIds.length" @click="batchToggle(false)"
+                            :disabled="loading">批量禁用
+                    </button>
+                    <button class="btn btn-sm btn-danger" v-if="selectedIds.length" @click="batchDelete"
+                            :disabled="loading">批量删除
+                    </button>
+                    <button class="btn btn-sm" @click="exportCsv">
+                        ⇩ {{ selectedIds.length ? '导出选中' : '导出' }}
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <section class="card" style="padding:0">
+            <div v-if="loading" class="loading-bar"></div>
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                    <tr>
+                        <th class="col-check">
+                            <input type="checkbox" :checked="allChecked" @change="toggleAll($event.target.checked)">
+                        </th>
+                        <th class="col-host">主机名</th>
+                        <th>IP地址</th>
+                        <th>内存</th>
+                        <th>CPU</th>
+                        <th>操作系统</th>
+                        <th>环境</th>
+                        <th class="col-tags">标签</th>
+                        <th>运维组</th>
+                        <th>开发组</th>
+                        <th>启用状态</th>
+                        <th class="col-actions">操作</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <tr v-for="row in list" :key="row.id" :class="{ selected: selectedIds.includes(row.id) }">
+                        <td>
+                            <input type="checkbox" :checked="selectedIds.includes(row.id)"
+                                   @change="toggleOne(row.id, $event.target.checked)">
+                        </td>
+                        <td>
+                            <div class="cell-main">{{ row.hostname || '-' }}</div>
+                            <div class="cell-sub" v-if="row.business">{{ row.business }}</div>
+                        </td>
+                        <td class="mono">{{ row.ip }}</td>
+                        <td class="mono">{{ formatMem(row) }}</td>
+                        <td class="mono">{{ row.cpu_count != null ? row.cpu_count + ' 核' : '-' }}</td>
+                        <td>
+                            <div>{{ row.os_type || '-' }}</div>
+                            <div class="cell-sub" v-if="row.os_version">{{ row.os_version }}</div>
+                        </td>
+                        <td>
+                            <span v-if="row.environment" class="badge badge-env">{{ row.environment }}</span>
+                            <span v-else class="badge">未设置</span>
+                        </td>
+                        <td class="col-tags">
+                            <template v-if="tagList(row.tags).length">
+                                <span class="tag" v-for="t in tagList(row.tags)" :key="t">{{ t }}</span>
+                            </template>
+                            <span v-else class="thin">-</span>
+                        </td>
+                        <td class="thin">{{ row.op_group || '-' }}</td>
+                        <td class="thin">{{ row.dev_group || '-' }}</td>
+                        <td>
+                            <span class="status" :class="row.enabled ? 'on' : 'off'">
+                                <span class="signal"><i></i><i></i><i></i></span>
+                                {{ row.enabled ? '正常' : '已禁用' }}
+                            </span>
+                        </td>
+                        <td>
+                            <div class="actions">
+                                <button class="link" @click="openDetail(row)">详情</button>
+                                <button class="link" @click="openEdit(row)">编辑</button>
+                                <button class="link" :class="row.enabled ? 'danger' : 'success'"
+                                        @click="toggleEnabled(row)">
+                                    {{ row.enabled ? '禁用' : '启用' }}
+                                </button>
+                                <button class="link danger" @click="deleteOne(row)">删除</button>
+                            </div>
+                        </td>
+                    </tr>
+                    <tr v-if="!list.length && !loading">
+                        <td colspan="12">
+                            <div class="empty">
+                                <span class="big">🗄</span>
+                                暂无主机数据
+                                <div class="thin" style="margin-top:8px">
+                                    等待客户端上报，或点击「批量导入」新增
+                                </div>
+                            </div>
+                        </td>
+                    </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- 分页 -->
+            <div class="pager" style="padding:16px 20px">
+                <div class="info">
+                    显示第 {{ total ? (page - 1) * pageSize + 1 : 0 }} 到
+                    {{ Math.min(page * pageSize, total) }} 条，共 {{ total }} 条记录
+                </div>
+                <div class="controls">
+                    <select class="filter" style="height:34px;min-width:104px" v-model.number="pageSize"
+                            @change="search">
+                        <option :value="10">10 条/页</option>
+                        <option :value="20">20 条/页</option>
+                        <option :value="50">50 条/页</option>
+                        <option :value="100">100 条/页</option>
+                    </select>
+                    <button @click="go(page - 1)" :disabled="page <= 1">‹</button>
+                    <button v-for="p in pageButtons" :key="p" :class="{ current: p === page }"
+                            @click="go(p)" :disabled="p === '...'">{{ p }}
+                    </button>
+                    <button @click="go(page + 1)" :disabled="page >= pages">›</button>
+                </div>
+            </div>
+        </section>
+
+        <footer class="footer">
+            © 2026 星谷 - CMDB配置管理系统 | 版本 v2.3.0
+        </footer>
+    </main>
+
+    <!-- 详情弹窗 -->
+    <div class="mask" v-if="detail.show" @click.self="detail.show = false">
+        <div class="modal">
+            <div class="modal-head">
+                <h3>主机详情</h3>
+                <button class="close" @click="detail.show = false">×</button>
+            </div>
+            <div class="modal-body" v-if="detail.data">
+                <div class="detail-title">
+                    <span class="icon">🖥</span>
+                    <div>
+                        <div style="font-size:15px;font-weight:600">{{ detail.data.hostname || '-' }}</div>
+                        <div class="thin">{{ detail.data.ip }}</div>
+                    </div>
+                    <span class="status" :class="detail.data.enabled ? 'on' : 'off'" style="margin-left:auto">
+                        <span class="signal"><i></i><i></i><i></i></span>
+                        {{ detail.data.enabled ? '正常' : '已禁用' }}
+                    </span>
+                </div>
+
+                <div class="detail-grid">
+                    <div class="item" v-for="f in detailFields" :key="f.key">
+                        <div class="k">{{ f.label }}</div>
+                        <div class="v">{{ detail.data[f.key] || '-' }}</div>
+                    </div>
+                </div>
+
+                <div class="section-title">磁盘信息（{{ (detail.data.disks || []).length }}）</div>
+                <table style="min-width:auto" v-if="(detail.data.disks || []).length">
+                    <thead>
+                    <tr>
+                        <th>设备</th>
+                        <th>挂载点</th>
+                        <th>文件系统</th>
+                        <th>大小</th>
+                        <th>挂载选项</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <tr v-for="(d, i) in detail.data.disks" :key="i">
+                        <td class="mono">{{ d.device }}</td>
+                        <td class="mono">{{ d.mountpoint }}</td>
+                        <td>{{ d.fstype }}</td>
+                        <td class="mono">{{ d.total_gb }} GB</td>
+                        <td class="thin">{{ d.opts }}</td>
+                    </tr>
+                    </tbody>
+                </table>
+                <div class="thin" v-else>该主机暂无磁盘上报数据</div>
+            </div>
+            <div class="modal-foot">
+                <button class="btn" @click="detail.show = false">关闭</button>
+                <button class="btn btn-primary" @click="openEdit(detail.data); detail.show = false">编辑</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 编辑弹窗 -->
+    <div class="mask" v-if="edit.show" @click.self="edit.show = false">
+        <div class="modal">
+            <div class="modal-head">
+                <h3>编辑主机 · {{ edit.target.ip }}</h3>
+                <button class="close" @click="edit.show = false">×</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-grid">
+                    <div class="field" v-for="f in editFields" :key="f.key">
+                        <label>{{ f.label }}</label>
+                        <input v-model="edit.form[f.key]" :list="'dl-' + f.key" :placeholder="f.placeholder || ''">
+                        <datalist :id="'dl-' + f.key">
+                            <option v-for="o in (options[f.optionKey] || [])" :key="o" :value="o"></option>
+                        </datalist>
+                    </div>
+                </div>
+                <p class="hint" style="margin-top:16px">
+                    提示：主机名、IP、CPU、内存、操作系统等字段由客户端上报自动维护，此处不可修改。
+                </p>
+            </div>
+            <div class="modal-foot">
+                <button class="btn" @click="edit.show = false">取消</button>
+                <button class="btn btn-primary" @click="saveEdit" :disabled="saving">
+                    {{ saving ? '保存中...' : '保存' }}
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 批量导入弹窗 -->
+    <div class="mask" v-if="imp.show" @click.self="imp.show = false">
+        <div class="modal">
+            <div class="modal-head">
+                <h3>批量导入主机</h3>
+                <button class="close" @click="imp.show = false">×</button>
+            </div>
+            <div class="modal-body">
+                <p class="hint" style="margin-bottom:14px">
+                    支持 CSV 文件（UTF-8）或直接粘贴 CSV 文本。字段：IP地址、主机名、环境、供应商、操作系统类型、
+                    操作系统版本、系统架构、发行版、发行版版本、CPU核心数、内存(GB)、node_exporter端口、区域、
+                    服务类型、业务线、序列号、运维组、开发组、标签。<br>
+                    以 <code>IP地址</code> 为唯一键：已存在则更新，不存在则新增。
+                </p>
+
+                <div style="display:flex;gap:10px;margin-bottom:16px">
+                    <a class="btn" href="/api/v1/host/import/template">⇩ 下载模板</a>
+                    <label class="btn" style="cursor:pointer">
+                        📁 选择CSV文件
+                        <input type="file" accept=".csv,text/csv" style="display:none" @change="pickFile">
+                    </label>
+                    <span class="thin" style="align-self:center">{{ imp.fileName || '未选择文件' }}</span>
+                </div>
+
+                <div class="field">
+                    <label>或粘贴 CSV 文本</label>
+                    <textarea v-model="imp.text" placeholder="IP地址,主机名,环境,...&#10;10.0.0.1,demo-host,测试环境,..."></textarea>
+                </div>
+
+                <div v-if="imp.result" style="margin-top:16px">
+                    <div class="section-title">导入结果</div>
+                    <p class="hint">{{ imp.result.msg }}</p>
+                    <ul class="hint" style="margin:8px 0 0 18px" v-if="imp.result.data.errors.length">
+                        <li v-for="(e, i) in imp.result.data.errors" :key="i">{{ e }}</li>
+                    </ul>
+                </div>
+            </div>
+            <div class="modal-foot">
+                <button class="btn" @click="imp.show = false">关闭</button>
+                <button class="btn btn-primary" @click="submitImport" :disabled="imp.loading || (!imp.file && !imp.text.trim())">
+                    {{ imp.loading ? '导入中...' : '开始导入' }}
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 危险操作确认弹窗 -->
+    <div class="mask" v-if="confirm.show" @click.self="closeConfirm(false)">
+        <div class="modal" style="max-width:520px">
+            <div class="modal-head">
+                <h3>{{ confirm.title }}</h3>
+                <button class="close" @click="closeConfirm(false)">×</button>
+            </div>
+            <div class="modal-body">
+                <div class="confirm-line">
+                    <span class="warn-icon">⚠</span>
+                    <div>
+                        <div style="font-weight:500">{{ confirm.words }}</div>
+                        <div class="thin" v-if="confirm.detail" style="margin-top:4px">{{ confirm.detail }}</div>
+                    </div>
+                </div>
+                <p class="hint" v-if="confirm.warn" style="margin-top:12px">{{ confirm.warn }}</p>
+
+                <div class="field" v-if="confirm.danger" style="margin-top:16px">
+                    <label>请输入 <code>{{ confirm.danger }}</code> 以确认此操作</label>
+                    <input v-model="confirm.input" :placeholder="confirm.danger" @keyup.enter="confirmMatched() && closeConfirm(true)">
+                </div>
+            </div>
+            <div class="modal-foot">
+                <button class="btn" @click="closeConfirm(false)">取消</button>
+                <button class="btn btn-danger-solid" @click="closeConfirm(true)"
+                        :disabled="!confirmMatched()">确认删除
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 操作结果弹窗 -->
+    <div class="mask" v-if="result.show" @click.self="result.show = false">
+        <div class="modal" style="max-width:460px">
+            <div class="modal-head">
+                <h3>{{ result.title }}</h3>
+                <button class="close" @click="result.show = false">×</button>
+            </div>
+            <div class="modal-body">
+                <div class="confirm-line">
+                    <span class="ok-icon">✓</span>
+                    <div style="font-weight:500">{{ result.msg }}</div>
+                </div>
+                <div class="result-stats" v-if="result.stats && result.stats.length">
+                    <div class="stat" v-for="s in result.stats" :key="s.label">
+                        <div class="k">{{ s.label }}</div>
+                        <div class="v">{{ s.value }}</div>
+                    </div>
+                </div>
+                <p class="hint" v-if="result.note" style="margin-top:14px">{{ result.note }}</p>
+            </div>
+            <div class="modal-foot">
+                <button class="btn btn-primary" @click="result.show = false">知道了</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 提示条 -->
+    <div class="toasts">
+        <div class="toast" :class="t.type" v-for="t in toasts" :key="t.id">{{ t.msg }}</div>
+    </div>
+</div>
+
+<script>
+    // Vue 已挂载：让页面内容显示出来（body 里的兜底提示同时隐藏）
+    function appMounted() {
+        const fb = document.getElementById('fallback');
+        if (fb) fb.style.display = 'none';
+        document.body.classList.remove('cdn-failed');
+        document.getElementById('app').classList.add('mounted');
+    }
+
+    // CDN 不可用时的兜底
+    window.addEventListener('error', function (e) {
+        if (e.target && e.target.tagName === 'SCRIPT') {
+            const fb = document.getElementById('fallback');
+            if (fb) fb.style.display = 'block';
+            document.getElementById('app').style.display = 'none';
+        }
+    }, true);
+</script>
+<script>
+    const {createApp} = Vue;
+
+    // 后端接口前缀
+    const API = '/api/v1/host';
+
+    createApp({
+        data() {
+            return {
+                menus: [
+                    {key: 'host', label: '主机管理', icon: '🖧'},
+                    {key: 'asset', label: '资产管理', icon: '📦'},
+                    {key: 'k8s', label: 'K8s管理', icon: '☸'},
+                    {key: 'middleware', label: '中间件管理', icon: '⚙'},
+                ],
+                // 列表数据
+                list: [],
+                total: 0,
+                page: 1,
+                pageSize: 10,
+                loading: false,
+                saving: false,
+                selectedIds: [],
+                // 筛选条件
+                filters: {q: '', environment: '', provider: '', os_type: '', enabled: ''},
+                options: {environment: [], provider: [], os_type: [], business: [], op_group: [], dev_group: []},
+                // 弹窗
+                detail: {show: false, data: null},
+                edit: {show: false, target: {}, form: {}},
+                imp: {show: false, file: null, fileName: '', text: '', loading: false, result: null},
+                confirm: {show: false, title: '', words: '', detail: '', warn: '', danger: '', input: '', resolve: null},
+                result: {show: false, title: '', msg: '', stats: [], note: ''},
+                toasts: [],
+                toastSeq: 0,
+                // 详情展示字段
+                detailFields: [
+                    {key: 'hostname', label: '主机名'},
+                    {key: 'ip', label: 'IP地址'},
+                    {key: 'environment', label: '环境'},
+                    {key: 'provider', label: '供应商'},
+                    {key: 'region', label: '区域'},
+                    {key: 'business', label: '业务线'},
+                    {key: 'service_type', label: '服务类型'},
+                    {key: 'os_type', label: '操作系统类型'},
+                    {key: 'os_version', label: '操作系统版本'},
+                    {key: 'os_arch', label: '系统架构'},
+                    {key: 'distribution_name', label: '发行版'},
+                    {key: 'distribution_version', label: '发行版版本'},
+                    {key: 'cpu_count', label: 'CPU核心数'},
+                    {key: 'mem_total_gb', label: '内存(GB)'},
+                    {key: 'node_exporter_port', label: 'node_exporter端口'},
+                    {key: 'serial', label: '序列号'},
+                    {key: 'op_group', label: '运维组'},
+                    {key: 'dev_group', label: '开发组'},
+                    {key: 'tags', label: '标签'},
+                    {key: 'report_time', label: '上报时间'},
+                    {key: 'create_time', label: '首次创建时间'},
+                    {key: 'update_time', label: '最后更新时间'},
+                ],
+                // 编辑字段（与后端 HostUpdateRequest 对齐）
+                editFields: [
+                    {key: 'environment', label: '环境', optionKey: 'environment', placeholder: '如：测试环境'},
+                    {key: 'provider', label: '供应商', optionKey: 'provider', placeholder: '如：阿里云'},
+                    {key: 'region', label: '区域', placeholder: '如：华东'},
+                    {key: 'service_type', label: '服务类型', placeholder: '如：物理机 / 虚拟机'},
+                    {key: 'business', label: '业务线', optionKey: 'business'},
+                    {key: 'serial', label: '序列号'},
+                    {key: 'op_group', label: '运维组', optionKey: 'op_group'},
+                    {key: 'dev_group', label: '开发组', optionKey: 'dev_group'},
+                    {key: 'tags', label: '标签', placeholder: '多个标签用英文逗号分隔'},
+                ],
+            };
+        },
+        computed: {
+            pages() {
+                return Math.max(1, Math.ceil(this.total / this.pageSize));
+            },
+            allChecked() {
+                return this.list.length > 0 && this.list.every(r => this.selectedIds.includes(r.id));
+            },
+            pageButtons() {
+                const pages = this.pages, cur = this.page, out = [];
+                if (pages <= 7) {
+                    for (let i = 1; i <= pages; i++) out.push(i);
+                    return out;
+                }
+                out.push(1);
+                let start = Math.max(2, cur - 1), end = Math.min(pages - 1, cur + 1);
+                if (start > 2) out.push('...');
+                for (let i = start; i <= end; i++) out.push(i);
+                if (end < pages - 1) out.push('...');
+                out.push(pages);
+                return out;
+            },
+        },
+        mounted() {
+            this.loadOptions();
+            this.fetchList();
+        },
+        methods: {
+            // ---------- 提示 ----------
+            tip(msg, type = '') {
+                const id = ++this.toastSeq;
+                this.toasts.push({id, msg, type});
+                setTimeout(() => {
+                    this.toasts = this.toasts.filter(t => t.id !== id);
+                }, 2600);
+            },
+
+            // 统一解析响应：服务端出错时返回的是纯文本（如 Internal Server Error），
+            // 直接 r.json() 会报 "Unexpected token"，这里给出可读的提示。
+            async readJson(response) {
+                const text = await response.text();
+                try {
+                    return JSON.parse(text);
+                } catch (e) {
+                    const brief = text.trim().slice(0, 120) || '(空响应)';
+                    throw new Error(`服务端返回 HTTP ${response.status}：${brief}`);
+                }
+            },
+
+            // ---------- 数据请求 ----------
+            buildQuery(extra = {}) {
+                const p = new URLSearchParams();
+                if (this.filters.q) p.set('q', this.filters.q);
+                if (this.filters.environment) p.set('environment', this.filters.environment);
+                if (this.filters.provider) p.set('provider', this.filters.provider);
+                if (this.filters.os_type) p.set('os_type', this.filters.os_type);
+                if (this.filters.enabled) p.set('enabled', this.filters.enabled);
+                Object.entries(extra).forEach(([k, v]) => p.set(k, v));
+                return p;
+            },
+
+            async fetchList() {
+                this.loading = true;
+                try {
+                    const p = this.buildQuery({page: this.page, page_size: this.pageSize});
+                    const res = await this.readJson(await fetch(`${API}/list?${p}`));
+                    if (res.code !== 0) throw new Error(res.msg || '查询失败');
+                    this.list = res.data.items;
+                    this.total = res.data.total;
+                    // 当前页被删/筛选后越界，回到最后一页
+                    if (this.page > this.pages && this.page > 1) {
+                        this.page = this.pages;
+                        return this.fetchList();
+                    }
+                    // 清理已不在本页的选中项
+                    const ids = this.list.map(r => r.id);
+                    this.selectedIds = this.selectedIds.filter(id => ids.includes(id));
+                } catch (e) {
+                    this.tip('加载失败：' + e.message, 'err');
+                } finally {
+                    this.loading = false;
+                }
+            },
+
+            async loadOptions() {
+                try {
+                    const res = await this.readJson(await fetch(`${API}/options`));
+                    if (res.code === 0) this.options = Object.assign(this.options, res.data);
+                } catch (e) {
+                    /* 筛选项加载失败不影响主流程 */
+                }
+            },
+
+            refresh() {
+                this.loadOptions();
+                this.fetchList();
+                this.tip('数据已刷新');
+            },
+
+            search() {
+                this.page = 1;
+                this.fetchList();
+            },
+
+            resetFilters() {
+                this.filters = {q: '', environment: '', provider: '', os_type: '', enabled: ''};
+                this.search();
+            },
+
+            go(p) {
+                if (p === '...' || p < 1 || p > this.pages || p === this.page) return;
+                this.page = p;
+                this.fetchList();
+            },
+
+            // ---------- 展示辅助 ----------
+            formatMem(row) {
+                if (row.mem_total_gb) return row.mem_total_gb + ' GB';
+                return row.mem_total ? (row.mem_total / 1024 ** 3).toFixed(1) + ' GB' : '-';
+            },
+
+            tagList(tags) {
+                if (!tags) return [];
+                return String(tags).split(/[,，;；\s]+/).filter(Boolean);
+            },
+
+            // ---------- 选择 ----------
+            toggleOne(id, checked) {
+                if (checked) {
+                    if (!this.selectedIds.includes(id)) this.selectedIds.push(id);
+                } else {
+                    this.selectedIds = this.selectedIds.filter(i => i !== id);
+                }
+            },
+
+            toggleAll(checked) {
+                const ids = this.list.map(r => r.id);
+                this.selectedIds = checked
+                    ? Array.from(new Set([...this.selectedIds, ...ids]))
+                    : this.selectedIds.filter(id => !ids.includes(id));
+            },
+
+            // ---------- 详情 / 编辑 ----------
+            async openDetail(row) {
+                this.detail.data = row;
+                this.detail.show = true;
+                try {
+                    const res = await this.readJson(await fetch(`${API}/detail/${row.id}`));
+                    if (res.code === 0) this.detail.data = res.data;
+                } catch (e) {
+                    this.tip('详情加载失败', 'err');
+                }
+            },
+
+            openEdit(row) {
+                if (!row || !row.id) return;
+                this.edit.target = row;
+                // 只提交变更字段，空值转 undefined 由后端 exclude_none 忽略
+                const form = {};
+                this.editFields.forEach(f => {
+                    const v = row[f.key];
+                    form[f.key] = (v === null || v === undefined) ? '' : v;
+                });
+                this.edit.form = form;
+                this.edit.show = true;
+            },
+
+            async saveEdit() {
+                const payload = {};
+                Object.entries(this.edit.form).forEach(([k, v]) => {
+                    const val = typeof v === 'string' ? v.trim() : v;
+                    const old = this.edit.target[k];
+                    // 只发送真正改动过的字段
+                    if (val !== '' && val !== (old === null || old === undefined ? '' : old)) payload[k] = val;
+                });
+                if (!Object.keys(payload).length) {
+                    this.tip('没有检测到修改内容');
+                    return;
+                }
+                this.saving = true;
+                try {
+                    const res = await this.readJson(await fetch(`${API}/${this.edit.target.id}`, {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify(payload),
+                    }));
+                    if (res.code !== 0) throw new Error(res.msg || '更新失败');
+                    this.edit.show = false;
+                    this.tip('更新成功', 'ok');
+                    this.loadOptions();
+                    this.fetchList();
+                } catch (e) {
+                    this.tip('更新失败：' + e.message, 'err');
+                } finally {
+                    this.saving = false;
+                }
+            },
+
+            // ---------- 启用 / 禁用 ----------
+            async toggleEnabled(row) {
+                const action = row.enabled ? 'disable' : 'enable';
+                const word = row.enabled ? '禁用' : '启用';
+                if (!confirm(`确定要${word}主机 ${row.ip} 吗？`)) return;
+                await this.setEnabled([row.id], action, word);
+            },
+
+            async batchToggle(enabled) {
+                const ids = [...this.selectedIds];
+                if (!ids.length) return;
+                const word = enabled ? '启用' : '禁用';
+                if (!confirm(`确定要批量${word}选中的 ${ids.length} 台主机吗？`)) return;
+                await this.setEnabled(ids, enabled ? 'enable' : 'disable', word);
+            },
+
+            async setEnabled(ids, action, word) {
+                let ok = 0, fail = 0;
+                for (const id of ids) {
+                    try {
+                        const res = await this.readJson(await fetch(`${API}/${id}/${action}`, {method: 'POST'}));
+                        res.code === 0 ? ok++ : fail++;
+                    } catch (e) {
+                        fail++;
+                    }
+                }
+                this.selectedIds = this.selectedIds.filter(id => !ids.includes(id));
+                this.tip(`${word}完成：成功 ${ok} 台${fail ? `，失败 ${fail} 台` : ''}`, fail ? 'err' : 'ok');
+                this.loadOptions();
+                this.fetchList();
+            },
+
+            // ---------- 删除 ----------
+            // 确认弹窗必须是异步的：删除不可逆，要让用户看清删的是哪几台
+            askConfirm(payload) {
+                return new Promise(resolve => {
+                    this.confirm = Object.assign({show: true, words: '', danger: ''}, payload);
+                    this.confirm.resolve = resolve;
+                });
+            },
+
+            closeConfirm(ok) {
+                const {resolve} = this.confirm;
+                this.confirm.show = false;
+                this.confirm.words = '';
+                this.confirm.danger = '';
+                if (resolve) resolve(ok);
+            },
+
+            // 用户在确认框里输入的内容是否匹配要求的确认词
+            confirmMatched() {
+                if (!this.confirm.danger) return true;
+                return (this.confirm.input || '').trim().toUpperCase() === this.confirm.danger.toUpperCase();
+            },
+
+            // 单台删除：走用户新加的 POST /{host_id}/delete
+            async deleteOne(row) {
+                const ok = await this.askConfirm({
+                    title: '删除主机',
+                    words: `即将删除主机 ${row.hostname || '(无主机名)'}（${row.ip}）`,
+                    warn: '删除后该主机及其磁盘记录将从数据库中永久移除，客户端下次上报会重新注册。',
+                    danger: '',
+                });
+                if (!ok) return;
+                await this.sendDelete([row.id], `${API}/${row.id}/delete`);
+            },
+
+            // 批量删除：一次请求发所有 id
+            async batchDelete() {
+                const ids = [...this.selectedIds];
+                if (!ids.length) return;
+                const rows = this.list.filter(r => ids.includes(r.id));
+                const names = rows.slice(0, 5).map(r => r.ip).join('、');
+                const ok = await this.askConfirm({
+                    title: '批量删除主机',
+                    words: `即将删除选中的 ${ids.length} 台主机`,
+                    detail: names + (rows.length > 5 ? ` 等 ${rows.length} 台` : ''),
+                    warn: '删除不可撤销，这些主机及其磁盘记录会一并从数据库中移除。',
+                    danger: 'DELETE',
+                });
+                if (!ok) return;
+                await this.sendDelete(ids, `${API}/batch/delete`);
+            },
+
+            async sendDelete(ids, url) {
+                this.loading = true;
+                try {
+                    const res = await this.readJson(await fetch(url, {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({ids}),
+                    }));
+                    if (res.code !== 0) throw new Error(res.msg || '删除失败');
+                    const d = res.data || {};
+                    this.selectedIds = this.selectedIds.filter(id => !ids.includes(id));
+                    // 延迟刷新，让用户看清结果
+                    setTimeout(() => {
+                        this.loadOptions();
+                        this.fetchList();
+                    }, 1500);
+                    this.askResult({
+                        title: '删除完成',
+                        msg: res.msg,
+                        stats: [
+                            {label: '已删除主机', value: d.deleted != null ? d.deleted : ids.length},
+                            {label: '关联磁盘', value: d.disks != null ? d.disks : '—'},
+                        ],
+                        note: '客户端若仍在运行，下次上报会自动重新注册该主机。',
+                    });
+                } catch (e) {
+                    this.tip('删除失败：' + e.message, 'err');
+                } finally {
+                    this.loading = false;
+                }
+            },
+
+            askResult(payload) {
+                this.result = Object.assign({show: true, title: '', msg: '', stats: [], note: ''}, payload);
+            },
+
+            // ---------- 导出 ----------
+            exportCsv() {
+                const p = this.selectedIds.length
+                    ? new URLSearchParams({ids: this.selectedIds.join(',')})
+                    : this.buildQuery();
+                window.open(`${API}/export?${p}`, '_blank');
+                this.tip('已开始下载导出文件');
+            },
+
+            // ---------- 批量导入 ----------
+            openImport() {
+                this.imp = {show: true, file: null, fileName: '', text: '', loading: false, result: null};
+            },
+
+            // 读取 CSV 文件内容填入文本框，以文本方式提交（不依赖服务端 multipart 解析）
+            // 注意：中文 Windows 的 Excel 另存 CSV 会用 GBK 且不带 BOM，
+            // 所以这里先按 UTF-8 严格解码，失败再退回 GBK，避免整片乱码。
+            pickFile(e) {
+                const file = e.target.files[0];
+                if (!file) return;
+                this.imp.file = file;
+                this.imp.fileName = file.name;
+                const reader = new FileReader();
+                reader.onload = () => {
+                    const decoded = this.decodeBytes(new Uint8Array(reader.result));
+                    if (!decoded.ok) {
+                        this.tip('文件编码无法识别，请在 Excel 里「另存为 → CSV UTF-8(逗号分隔)」后重试', 'err');
+                        return;
+                    }
+                    this.imp.text = decoded.text.replace(/^\uFEFF/, '');
+                    if (decoded.encoding !== 'utf-8') {
+                        this.tip(`已按 ${decoded.encoding.toUpperCase()} 编码读取（Excel 另存为的 CSV 常见编码）`);
+                    }
+                };
+                reader.onerror = () => this.tip('文件读取失败，请重试或直接粘贴 CSV 内容', 'err');
+                // 读成字节数组，自己判编码，不用浏览器默认编码
+                reader.readAsArrayBuffer(file);
+            },
+
+            // 严格解码：先 UTF-8，再 GBK/GB18030
+            decodeBytes(bytes) {
+                for (const encoding of ['utf-8', 'gb18030']) {
+                    try {
+                        const text = new TextDecoder(encoding, {fatal: true}).decode(bytes);
+                        return {ok: true, text, encoding};
+                    } catch (err) {
+                        /* 换下一种编码 */
+                    }
+                }
+                return {ok: false};
+            },
+
+            async submitImport() {
+                const csv = this.imp.text.trim();
+                if (!csv) {
+                    this.tip('请先选择要导入的 CSV 文件，或粘贴 CSV 内容', 'err');
+                    return;
+                }
+                this.imp.loading = true;
+                try {
+                    const res = await this.postCsv(csv);
+                    if (res.code !== 0) throw new Error(res.msg || '导入失败');
+                    this.imp.result = res;
+                    this.tip(res.msg, 'ok');
+                    this.imp.file = null;
+                    this.imp.fileName = '';
+                    this.imp.text = '';
+                    this.loadOptions();
+                    this.search();
+                } catch (e) {
+                    this.tip('导入失败：' + e.message, 'err');
+                } finally {
+                    this.imp.loading = false;
+                }
+            },
+
+            // CSV 以文本方式提交，服务端无需 python-multipart 即可解析
+            async postCsv(csv) {
+                return this.readJson(await fetch(`${API}/import`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'text/csv; charset=utf-8'},
+                    body: csv,
+                }));
+            },
+        },
+    }).mount('#app');
+
+    appMounted();
+</script>
+</body>
+</html>
